@@ -4,18 +4,7 @@ EOS_CONTRACTS_DIR=~/git/eos/build/contracts
 WALLET_PASSWORD=$(cat ~/eos_xbl_dawn3/wallet/default.passwd)
 KEYS_FILE=~/git/manage_eos/keys
 
-prompt_input_yN()
-{
-    printf "$1? [y|N] " ; shift
-    while true; do
-        read -k 1 yn
-        case ${yn} in
-            [Yy]* ) printf "\n"; return 0; break;;
-            \n ) printf "\n"; return 1; break;;
-            * ) return 1;;
-        esac
-    done
-}
+source $(dirname "$0")/prompt_input_yN/prompt_input_yN.sh
 
 eos_unlock_wallet()
 {
