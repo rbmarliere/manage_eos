@@ -1,13 +1,16 @@
 #!/bin/sh
 
 EOS_CONTRACTS_DIR=~/git/eos/build/contracts
-WALLET_PASSWORD=$(cat ~/eos_xbl_dawn3/wallet/default.passwd)
+WALLET_PASSWORD=$(cat ~/eos_xbl/wallet/default.passwd)
 KEYS_FILE=~/git/manage_eos/keys
 
 source $(dirname "$0")/prompt_input_yN/prompt_input_yN.sh
 
 eos_unlock_wallet()
 {
+    if [ $# > 0 ]; then
+        WALLET_PASSWORD=$(cat $1) ; shift
+    fi
     if [ "$(eosc wallet list | grep '*')" = "" ]; then
         eosc wallet unlock --password=${WALLET_PASSWORD}
     fi
@@ -55,20 +58,21 @@ eos_init_chain()
 
 eos_init_contract()
 {
-    CONTRACT=$1 ; shift
+    CONTRACT_DIR=$1 ; shift
+    CONTRACT_NAME=$1 ; shift
 
     PWD=$(pwd)
-    cd ~/git/${CONTRACT}
+    cd ${CONTRACT_DIR}
 
     if prompt_input_yN "generate abi"; then
-        eoscpp -g ${CONTRACT}.abi ${CONTRACT}.cpp || return 1
+        eoscpp -g ${CONTRACT_NAME}.abi ${CONTRACT_NAME}.cpp || return 1
     fi
     if prompt_input_yN "build contract"; then
-        eoscpp -o ${CONTRACT}.wast ${CONTRACT}.cpp || return 1
+        eoscpp -o ${CONTRACT_NAME}.wast ${CONTRACT_NAME}.cpp || return 1
     fi
     if prompt_input_yN "deploy contract"; then
         eos_unlock_wallet
-        eosc set contract ${CONTRACT} . ${CONTRACT}.wast ${CONTRACT}.abi -p ${CONTRACT}@active
+        eosc set contract ${CONTRACT_NAME} . ${CONTRACT_NAME}.wast ${CONTRACT_NAME}.abi -p ${CONTRACT_NAME}@active
     fi
 
     cd ${PWD}
