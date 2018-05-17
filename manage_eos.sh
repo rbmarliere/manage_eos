@@ -1,62 +1,60 @@
 #!/bin/sh
 
 EOS_CONTRACTS_DIR=~/git/eos/build/contracts
-WALLET_PASSWORD=$(cat ~/eos_xbl/wallet/default.passwd)
+WALLET_PASSWORD=$(cat ~/eosio-wallet/default.passwd)
 KEYS_FILE=~/git/manage_eos/keys
 
 source $(dirname "$0")/prompt_input_yN/prompt_input_yN.sh
 
-eos_unlock_wallet()
+eosio_unlock_wallet()
 {
-    if [ $# > 0 ]; then
+    if [ $# -gt 0 ]; then
         WALLET_PASSWORD=$(cat $1) ; shift
     fi
-    if [ "$(eosc wallet list | grep '*')" = "" ]; then
-        eosc wallet unlock --password=${WALLET_PASSWORD}
+    if [ "$(cleos wallet list | grep '*')" = "" ]; then
+        cleos wallet unlock --password=${WALLET_PASSWORD} || return 1
     fi
 }
 
-eos_init_accounts()
+eosio_init_accounts()
 {
-    imported=$(eosc wallet keys)
+    imported=$(cleos wallet keys)
     while read line ; do
         name=$(echo ${line} | cut -d ' ' -f 1)
-        pubkey=$(echo ${line} | cut -d '"' -f 2)
-        privkey=$(echo ${line} | cut -d '"' -f 4)
+        pubkey=$(echo ${line} | cut -d ' ' -f 2)
+        privkey=$(echo ${line} | cut -d ' ' -f 3)
         if [ "$(echo ${imported} | grep ${privkey})" = "" ]; then
-            eosc wallet import ${privkey}
+            cleos wallet import ${privkey} || return 1
         fi
         if [ "${name}" != "eosio" ]; then
-            if [ "$(eosc get account ${name} | grep '"permissions": \[\]')" != "" ]; then
-                eosc create account eosio ${name} ${pubkey} ${pubkey}
-            fi
+            cleos get account ${name} || cleos create account eosio ${name} ${pubkey} ${pubkey} || return 1
         fi
     done < ${KEYS_FILE}
 }
 
-eos_init_chain()
+eosio_init_chain()
 {
-    eos_unlock_wallet
-    eos_init_accounts
+    eosio_unlock_wallet || { printf "error: could not unlock wallet\n"; return 1 }
+    eosio_init_accounts || { printf "error: coult not import accounts\n"; return 1 }
 
-    eosc set contract eosio ${EOS_CONTRACTS_DIR}/eosio.bios -p eosio@active
+    cleos set contract eosio ${EOS_CONTRACTS_DIR}/eosio.bios -p eosio
 
-    eosio=$(cat ${KEYS_FILE} | grep 'eosio ' | cut -d '"' -f 2)
-    zaratustra=$(cat ${KEYS_FILE} | grep zaratustra | cut -d '"' -f 2)
-    eosc push action eosio setprods '{"version":"1","producers":[{"producer_name":"eosio","block_signing_key":"'${eosio}'"},{"producer_name":"zaratustra","block_signing_key":"'${zaratustra}'"}]}' -p eosio@active
+    eosio=$(cat ${KEYS_FILE} | grep 'eosio ' | cut -d ' ' -f 2)
+    zaratustra=$(cat ${KEYS_FILE} | grep zaratustra | cut -d ' ' -f 2)
+    cleos push action eosio setprods '{"schedule":[{"producer_name":"eosio","block_signing_key":"'${eosio}'"},{"producer_name":"zaratustra","block_signing_key":"'${zaratustra}'"}]}' -p eosio
 
-    eosc set contract eosio.token ${EOS_CONTRACTS_DIR}/eosio.token -p eosio.token@active
-    eosc push action eosio.token create '{"issuer":"eosio", "maximum_supply":"1000000000.0000 EOS", "can_freeze":0, "can_recall":0, "can_whitelist":0}' -p eosio.token@active
+    cleos set contract eosio.token ${EOS_CONTRACTS_DIR}/eosio.token -p eosio.token
+    cleos push action eosio.token create '{"issuer":"eosio", "maximum_supply":"1000000000.0000 EOS", "can_freeze":0, "can_recall":0, "can_whitelist":0}' -p eosio.token
 
     while read line; do
         name=$(echo ${line} | cut -d ' ' -f 1)
         if [ "${name}" != "eosio" ]; then
-            eosc push action eosio.token issue '{"to":"'${name}'","quantity":"100000.0000 EOS","memo":"memo"}' -p eosio@active
+            cleos push action eosio.token issue '{"to":"'${name}'","quantity":"100000.0000 EOS","memo":"memo"}' -p eosio
         fi
     done < ${KEYS_FILE}
 }
 
-eos_init_contract()
+eosio_init_contract()
 {
     CONTRACT_DIR=$1 ; shift
     CONTRACT_NAME=$1 ; shift
@@ -65,14 +63,14 @@ eos_init_contract()
     cd ${CONTRACT_DIR}
 
     if prompt_input_yN "generate abi"; then
-        eoscpp -g ${CONTRACT_NAME}.abi ${CONTRACT_NAME}.cpp || return 1
+        eosiocpp -g ${CONTRACT_NAME}.abi ${CONTRACT_NAME}.cpp || return 1
     fi
     if prompt_input_yN "build contract"; then
-        eoscpp -o ${CONTRACT_NAME}.wast ${CONTRACT_NAME}.cpp || return 1
+        eosiocpp -o ${CONTRACT_NAME}.wast ${CONTRACT_NAME}.cpp || return 1
     fi
     if prompt_input_yN "deploy contract"; then
-        eos_unlock_wallet
-        eosc set contract ${CONTRACT_NAME} . ${CONTRACT_NAME}.wast ${CONTRACT_NAME}.abi -p ${CONTRACT_NAME}@active
+        eosio_unlock_wallet || { printf "error: could not unlock wallet\n"; return 1 }
+        cleos set contract ${CONTRACT_NAME} . ${CONTRACT_NAME}.wast ${CONTRACT_NAME}.abi -p ${CONTRACT_NAME}
     fi
 
     cd ${PWD}
