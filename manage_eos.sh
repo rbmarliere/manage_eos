@@ -1,8 +1,8 @@
 #!/bin/sh
 
 EOS_CONTRACTS_DIR=~/git/eos/build/contracts
+KEYS_FILE=$(dirname "$0")/keys
 WALLET_PASSWORD=$(cat ~/eosio-wallet/default.passwd)
-KEYS_FILE=~/git/manage_eos/keys
 
 source $(dirname "$0")/prompt_input_yN/prompt_input_yN.sh
 
@@ -23,7 +23,7 @@ eosio_init_accounts()
         name=$(echo ${line} | cut -d ' ' -f 1)
         pubkey=$(echo ${line} | cut -d ' ' -f 2)
         privkey=$(echo ${line} | cut -d ' ' -f 3)
-        if [ "$(echo ${imported} | grep ${privkey})" = "" ]; then
+        if [ "$(echo ${imported} | grep ${pubkey})" = "" ]; then
             cleos wallet import ${privkey} || return 1
         fi
         if [ "${name}" != "eosio" ]; then
