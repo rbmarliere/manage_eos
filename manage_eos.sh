@@ -27,6 +27,7 @@ eosio_init_accounts()
     use_system_contract=${2:-"no"}
     amount=${3:-"1.0000 EOS"}
     reg_producer=${4:-"no"}
+    issue_amount=${5:-"no"}
 
     imported=$(cleos wallet keys)
 
@@ -54,6 +55,10 @@ eosio_init_accounts()
 
         if [ "${reg_producer}" != "no" ]; then
             cleos system regproducer ${name} ${pubkey} || return 1
+        fi
+
+        if [ "${issue_amount}" != "no" ]; then
+            cleos push action eosio.token issue '["'${name}'", "'${issue_amount}'", "memo"]' -p eosio
         fi
     done < ${keys}
 }
