@@ -1,5 +1,6 @@
 #!/bin/sh
 
+BOOST_ROOT=${HOME}/opt/boost
 EOS_CONTRACTS_DIR=${USER_GIT_ROOT}/eosio.contracts
 KEYS_PRODUCERS=$(dirname "$0")/keys.producers
 KEYS_SYSTEM=$(dirname "$0")/keys.system
@@ -100,12 +101,16 @@ eosio_init_contract()
     PWD=$(pwd)
     cd ${CONTRACT_DIR}
 
-    if prompt_input_yN "generate abi"; then
-        eosiocpp -g ${CONTRACT_NAME}.abi ${CONTRACT_NAME}.cpp || return 1
+    if [ -d "${BOOST_ROOT}" ]; then
+        BOOST="-I${BOOST_ROOT}/include"
+    else
+        BOOST=
     fi
+
     if prompt_input_yN "build contract"; then
         eosiocpp -o ${CONTRACT_NAME}.wast ${CONTRACT_NAME}.cpp || return 1
     fi
+
     if prompt_input_yN "deploy contract"; then
         eosio_unlock_wallet || { printf "error: could not unlock wallet\n"; return 1 }
         cleos set contract ${CONTRACT_NAME} . ${CONTRACT_NAME}.wast ${CONTRACT_NAME}.abi -p ${CONTRACT_NAME}
