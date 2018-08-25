@@ -101,10 +101,10 @@ eosio_init_chain()
 
 eosio_init_contract()
 {
-    CONTRACT_DIR=$1 ; shift
     CONTRACT_NAME=$1 ; shift
-
+    ACCOUNT=$1 ; shift
     PWD=$(pwd)
+    CONTRACT_DIR=${USER_GIT_ROOT}/${CONTRACT_NAME}
     cd ${CONTRACT_DIR}
 
     if [ -d "${BOOST_ROOT}" ]; then
@@ -114,12 +114,22 @@ eosio_init_contract()
     fi
 
     if prompt_input_yN "build contract"; then
-        eosiocpp -o ${CONTRACT_NAME}.wast ${CONTRACT_NAME}.cpp || return 1
+        eosiocpp \
+            "-I./include" \
+            ${BOOST} \
+            -o bin/${CONTRACT_NAME}.wast \
+            src/*.cpp || return 1
     fi
 
     if prompt_input_yN "deploy contract"; then
-        eosio_unlock_wallet || { printf "error: could not unlock wallet\n"; return 1 }
-        cleos set contract ${CONTRACT_NAME} . ${CONTRACT_NAME}.wast ${CONTRACT_NAME}.abi -p ${CONTRACT_NAME}
+        if ! eosio_unlock_wallet; then
+            printf "error: could not unlock wallet\n"
+            return 1
+        fi
+        if ! cleos set contract ${ACCOUNT} . bin/${CONTRACT_NAME}.wast abi/${CONTRACT_NAME}.abi -p ${ACCOUNT}; then
+            printf "error: could not deploy contract\n"
+            return 1
+        fi
     fi
 
     cd ${PWD}
