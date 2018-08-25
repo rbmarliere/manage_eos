@@ -18,6 +18,11 @@ eosio_unlock_wallet()
 
 eosio_init_accounts()
 {
+    if ! eosio_unlock_wallet; then
+        printf "error: could not unlock wallet\n"
+        return 1
+    fi
+
     keys=${1:-${KEYS_SYSTEM}}
     use_system_contract=${2:-"no"}
     amount=${3:-"1.0000 EOS"}
@@ -55,10 +60,6 @@ eosio_init_accounts()
 
 eosio_init_chain()
 {
-    if ! eosio_unlock_wallet; then
-        printf "error: could not unlock wallet\n"
-        return 1
-    fi
     if ! eosio_init_accounts; then
         printf "error: could not create system accounts\n"
         return 1
