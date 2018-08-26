@@ -1,6 +1,5 @@
 #!/bin/sh
 
-BOOST_ROOT=${HOME}/opt/boost
 EOS_CONTRACTS_DIR=${USER_GIT_ROOT}/eosio.contracts
 KEYS_PRODUCERS=$(dirname "$0")/keys.producers
 KEYS_SYSTEM=$(dirname "$0")/keys.system
@@ -99,39 +98,30 @@ eosio_init_chain()
     cleos push action eosio updateauth '{"account": "eosio", "permission": "active", "parent": "owner", "auth": {"threshold": 1, "keys": [], "waits": [], "accounts": [{"weight": 1, "permission": {"actor": "eosio.prods", "permission": "active"}}]}}' -p eosio@active
 }
 
-eosio_init_contract()
+eosio_deploy_contract()
 {
-    CONTRACT_NAME=$1 ; shift
     ACCOUNT=$1 ; shift
-    PWD=$(pwd)
-    CONTRACT_DIR=${USER_GIT_ROOT}/${CONTRACT_NAME}
-    cd ${CONTRACT_DIR}
+    CONTRACT_DIR=$1 ; shift
 
-    if [ -d "${BOOST_ROOT}" ]; then
-        BOOST="-I${BOOST_ROOT}/include"
-    else
-        BOOST=
+    pushd ${CONTRACT_DIR}
+
+    if ! eosio_unlock_wallet; then
+        printf "error: could not unlock wallet\n"
+        return 1
     fi
 
-    if prompt_input_yN "build contract"; then
-        eosiocpp \
-            "-I./include" \
-            ${BOOST} \
-            -o bin/${CONTRACT_NAME}.wast \
-            src/*.cpp || return 1
+    wasm=$(find . -name *.wasm | egrep "*" || echo not_found)
+    abi=$(find . -name *.abi | egrep "*" || echo not_found)
+    if [ "${wasm}" = "not_found" ] || [ "${abi}" = "not_found" ]; then
+        printf "error: could not find wasm or abi.\n"
+        return 1
     fi
 
-    if prompt_input_yN "deploy contract"; then
-        if ! eosio_unlock_wallet; then
-            printf "error: could not unlock wallet\n"
-            return 1
-        fi
-        if ! cleos set contract ${ACCOUNT} . bin/${CONTRACT_NAME}.wast abi/${CONTRACT_NAME}.abi -p ${ACCOUNT}; then
-            printf "error: could not deploy contract\n"
-            return 1
-        fi
+    if ! cleos set contract ${ACCOUNT} . ${wasm} ${abi} -p ${ACCOUNT}; then
+        printf "error: could not deploy contract\n"
+        return 1
     fi
 
-    cd ${PWD}
+    popd
 }
 
