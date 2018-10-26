@@ -119,7 +119,10 @@ eosio_deploy_contract()
 
     if ! cleos set contract ${ACCOUNT} . ${wasm} ${abi} -p ${ACCOUNT}; then
         printf "error: could not set contract.\n"
-        prompt_input_yN "continue" || return 1
+        if ! prompt_input_yN "continue"; then
+            popd
+            return 1
+        fi
     fi
 
     popd
