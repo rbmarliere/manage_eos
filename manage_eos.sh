@@ -1,17 +1,18 @@
-#!/bin/sh
+#!/bin/bash
 
-EOS_CONTRACTS_DIR=${USER_GIT_ROOT}/eosio.contracts
+EOS_CONTRACTS_DIR=${USER_GIT_ROOT}/eosio.contracts/build
 KEYS_PRODUCERS=$(dirname "$0")/keys.producers
 KEYS_SYSTEM=$(dirname "$0")/keys.system
 KEYS_USERS=$(dirname "$0")/keys.users
-WALLET_PASSWORD=$(cat ~/eosio-wallet/default.passwd)
+WALLET_PASSWORD=$(cat ~/eosio-wallet/local.passwd)
 
 source $(dirname "$0")/prompt_input_yN/prompt_input_yN.sh
 
 eosio_unlock_wallet()
 {
+    WALLET=${WALLET:-local}
     if [ "$(cleos wallet list | grep '*')" = "" ]; then
-        cleos wallet unlock --password=${WALLET_PASSWORD} || return 1
+        cleos wallet unlock -n ${WALLET} --password=${WALLET_PASSWORD} || return 1
     fi
 }
 
@@ -22,6 +23,7 @@ eosio_init_accounts()
         return 1
     fi
 
+    WALLET=${WALLET:-local}
     keys=${1:-${KEYS_SYSTEM}}
     use_system_contract=${2:-"no"}
     amount=${3:-"1.0000 EOS"}
@@ -36,7 +38,7 @@ eosio_init_accounts()
         privkey=$(echo ${line} | cut -d ' ' -f 3)
 
         if [ "$(echo ${imported} | grep ${pubkey})" = "" ]; then
-            cleos wallet import --private-key ${privkey} || return 1
+            cleos wallet import -n ${WALLET} --private-key ${privkey} || return 1
         fi
 
         if [ "${name}" = "eosio" ]; then
@@ -69,11 +71,12 @@ eosio_init_chain()
         return 1
     fi
 
-    cleos set contract eosio.token ${EOS_CONTRACTS_DIR}/eosio.token/bin/eosio.token
-    cleos set contract eosio.msig ${EOS_CONTRACTS_DIR}/eosio.msig/bin/eosio.msig
+    cleos set contract eosio.token ${EOS_CONTRACTS_DIR}/eosio.token
+    cleos set contract eosio.msig ${EOS_CONTRACTS_DIR}/eosio.msig
     cleos push action eosio.token create '["eosio", "10000000000.0000 EOS"]' -p eosio.token
     cleos push action eosio.token issue '["eosio", "1000000000.0000 EOS", "memo"]' -p eosio
-    cleos set contract eosio ${EOS_CONTRACTS_DIR}/eosio.system/bin/eosio.system
+    cleos set contract eosio ${EOS_CONTRACTS_DIR}/eosio.system
+    cleos push action eosio init '[0,"4,EOS"]' -p eosio
     cleos push action eosio setpriv '["eosio.msig", 1]' -p eosio@active
 
     if ! eosio_init_accounts ${KEYS_USERS} use_system_contract "16000000.0000 EOS"; then
@@ -87,10 +90,8 @@ eosio_init_chain()
 
     while read voter_ln; do
         voter=$(echo ${voter_ln} | cut -d ' ' -f 1)
-        while read producer_ln; do
-            producer=$(echo ${producer_ln} | cut -d ' ' -f 1)
-            cleos system voteproducer approve ${voter} ${producer} || break
-        done < ${KEYS_PRODUCERS}
+        producers=$(tail -n 30 ${KEYS_PRODUCERS} | cut -d ' ' -f 1 | tr '\n' ' ')
+        eval cleos system voteproducer prods ${voter} ${producers} || break
     done < ${KEYS_USERS}
 
     # resign eosio
