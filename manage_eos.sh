@@ -4,20 +4,24 @@ EOS_CONTRACTS_DIR=${USER_GIT_ROOT}/eosio.contracts/build
 KEYS_PRODUCERS=$(dirname "$0")/keys.producers
 KEYS_SYSTEM=$(dirname "$0")/keys.system
 KEYS_USERS=$(dirname "$0")/keys.users
-WALLET_PASSWORD=$(cat ~/eosio-wallet/local.passwd)
 
 source $(dirname "$0")/prompt_input_yN/prompt_input_yN.sh
 
 eosio_unlock_wallet()
 {
     WALLET=${WALLET:-local}
-    if [ "$(cleos wallet list | grep '*')" = "" ]; then
+    WALLET_PASSWORD=$(cat ~/eosio-wallet/${WALLET}.passwd)
+    if [ "$(cleos wallet list | grep ${WALLET}' \*')" = "" ]; then
         cleos wallet unlock -n ${WALLET} --password=${WALLET_PASSWORD} || return 1
     fi
 }
 
 eosio_init_accounts()
 {
+    if ! prompt_input_yN "create accounts"; then
+        return 0
+    fi
+
     if ! eosio_unlock_wallet; then
         printf "error: could not unlock wallet\n"
         return 1
@@ -127,5 +131,15 @@ eosio_deploy_contract()
     fi
 
     popd
+}
+
+eosio_set_code_permission()
+{
+    # https://eosio.stackexchange.com/questions/1621/require-inline-action-be-sent-by-contract-and-not-account
+
+    ACCOUNT=$1 ; shift
+    PUBKEY=$1 ; shift
+
+    cleos set account permission $ACCOUNT active '{"threshold": 1,"keys": [{"key": "'$PUBKEY'","weight": 1}],"accounts": [{"permission":{"actor":"'$ACCOUNT'","permission":"eosio.code"},"weight":1}]}' owner -p $ACCOUNT
 }
 
